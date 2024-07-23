@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # URL of our Flask application
-URL="http://localhost:5000"
+URL="http://127.0.0.1:5000"
 
 # Function to generate a random float between min and max
 random_float() {
-    awk -v min=$1 -v max=$2 'BEGIN{srand(); print min+rand()*(max-min)}'
+    printf "%.4f" $(awk -v min=$1 -v max=$2 'BEGIN{srand(); print min+rand()*(max-min)}')
 }
 
 # Array of names
@@ -18,14 +18,15 @@ send_post_request() {
     lon=$(random_float -100 -70)
     
     echo "Sending POST request for $name"
-    curl -s -X POST $URL -H "Content-Type: application/json" \
-         -d "{\"user\":\"$name\", \"lat\":$lat, \"long\":$lon}"
+    response=$(curl -s -X POST $URL -H "Content-Type: application/json" \
+         -d "{\"user\":\"$name\", \"lat\":$lat, \"long\":$lon}")
+    echo "Response: $response"
     echo
 }
 
 # Send POST requests
 for name in "${names[@]}"; do
-    send_post_request $name
+    send_post_request "$name"
 done
 
 # Send additional POST requests to update some users
@@ -34,8 +35,17 @@ for i in {1..5}; do
     send_post_request "${names[$random_index]}"
 done
 
+# Start the game
+echo "Starting the game"
+start_response=$(curl -s -X POST $URL/start)
+echo "Start Game Response:"
+echo "$start_response" | python3 -m json.tool
+echo
+
 # Send GET request
 echo "Sending GET request"
-curl -s -X GET $URL | json_pp
+get_response=$(curl -s -X GET $URL)
+echo "GET Response:"
+echo "$get_response" | python3 -m json.tool
 
 echo "Test completed."

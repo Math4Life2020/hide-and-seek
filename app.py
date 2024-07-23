@@ -1,11 +1,10 @@
 import os
 import pickle
-import math
+import random
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# File to store our pickle database
 DB_FILE = 'users.pickle'
 
 def load_users():
@@ -19,7 +18,6 @@ def save_users(users):
         pickle.dump(users, f)
 
 def round_coordinates(lat, long):
-    # Round to nearest 0.5 degree (roughly 55 km at the equator)
     return round(lat * 2) / 2, round(long * 2) / 2
 
 @app.route('/', methods=['POST'])
@@ -35,11 +33,9 @@ def register_or_update_user():
         return jsonify({"error": "Missing required fields"}), 400
     
     if user in users:
-        # Update existing user
         users[user]['lat'] = lat
         users[user]['long'] = long
     else:
-        # Register new user
         users[user] = {
             'type': 'NOTSTARTED',
             'lat': lat,
@@ -81,6 +77,25 @@ def get_users():
             })
     
     return jsonify(result)
+
+@app.route('/start', methods=['POST'])
+def start_game():
+    users = load_users()
+    if len(users) < 4:
+        return jsonify({"error": "Not enough users to start the game"}), 400
+    
+    user_list = list(users.keys())
+    random.shuffle(user_list)
+    
+    for i, user in enumerate(user_list):
+        if i < 3:
+            users[user]['type'] = 'HUNTER'
+        else:
+            users[user]['type'] = 'SPEEDRUNNER'
+    
+    save_users(users)
+    
+    return jsonify({"message": "Game started", "hunters": user_list[:3], "speedrunners": user_list[3:]})
 
 if __name__ == '__main__':
     app.run(debug=True)
