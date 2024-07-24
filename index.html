@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map with Precise and Regional Point Display</title>
+</head>
+<body>
+    <canvas id="mapCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Configuration (you'll need to adjust these values)
+        const mapImage = new Image();
+        mapImage.src = 'map.png';
+        const columns = 10; // Replace with your actual number of columns
+        const rows = 10;    // Replace with your actual number of rows
+
+        const bottomLeft = [37.652619930133646, -122.06165595572794];
+        const topRight = [37.65990423441164, -122.0513671139975];
+
+        // Longitude markings for vertical dividers (columns + 1)
+        const lonMarkings = [];
+        for (let i = 0; i < columns; i++) {
+            lonMarkings.push(bottomLeft[1] + i*(topRight[1] - bottomLeft[1])/columns);
+        }
+        
+        // Latitude markings for horizontal dividers (rows + 1)
+        const latMarkings = [];
+        for (let i = 0; i < rows; i++) {
+            latMarkings.push(bottomLeft[0] + i*(topRight[0] - bottomLeft[0])/rows);
+        }
+
+        // List of hunter points to display precisely (latitude, longitude)
+        const hunterPoints = [
+            { lat: 37.656, lon: -122.056 }, // Replace with your actual hunter points
+            { lat: 37.657, lon: -122.057 },
+            // Add more points as needed
+        ];
+
+        // List of speed points to count by region (latitude, longitude)
+        const speedPoints = [
+            { lat: 37.655, lon: -122.055 }, // Replace with your actual speed points
+            { lat: 37.654, lon: -122.054 },
+            // Add more points as needed
+        ];
+
+        mapImage.onload = function() {
+            canvas.width = mapImage.width;
+            canvas.height = mapImage.height;
+            
+            // Draw the map image
+            ctx.drawImage(mapImage, 0, 0);
+            
+            // Draw grid
+            drawGrid();
+            
+            // Count and display speed points in each cell
+            countAndDisplaySpeedPoints();
+            
+            // Display hunter points precisely
+            displayHunterPoints();
+        };
+
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 1.0)';
+            ctx.lineWidth = 1;
+
+            // Draw vertical lines
+            for (let i = 1; i < columns; i++) {
+                const x = (i / columns) * canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            // Draw horizontal lines
+            for (let i = 1; i < rows; i++) {
+                const y = (i / rows) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function countAndDisplaySpeedPoints() {
+            const cellCounts = Array(rows).fill().map(() => Array(columns).fill(0));
+
+            speedPoints.forEach(point => {
+                const col = findIndex(lonMarkings, point.lon);
+                const row = findIndex(latMarkings, point.lat);
+                if (col >= 0 && col < columns && row >= 0 && row < rows) {
+                    cellCounts[row][col]++;
+                }
+            });
+
+            ctx.font = '20px Arial';
+            ctx.fillStyle = 'black';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < columns; col++) {
+                    const x = (col + 0.5) * (canvas.width / columns);
+                    const y = (row + 0.5) * (canvas.height / rows);
+                    ctx.fillText(cellCounts[row][col].toString(), x, y);
+                }
+            }
+        }
+
+        function displayHunterPoints() {
+            hunterPoints.forEach(point => {
+                const x = mapCoordToCanvasX(point.lon);
+                const y = mapCoordToCanvasY(point.lat);
+                
+                console.log(`Hunter point at (${x}, ${y})`);
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, 2 * Math.PI); // Increase the radius to make the circle bigger
+                ctx.fillStyle = 'red';
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.stroke();
+            });
+        }
+
+        function findIndex(arr, value) {
+            for (let i = 0; i < arr.length - 1; i++) {
+                if (value >= arr[i] && value < arr[i + 1]) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function mapCoordToCanvasX(lon) {
+            return (lon - lonMarkings[0]) / (lonMarkings[lonMarkings.length - 1] - lonMarkings[0]) * canvas.width;
+        }
+
+        function mapCoordToCanvasY(lat) {
+            return canvas.height - (lat - latMarkings[0]) / (latMarkings[latMarkings.length - 1] - latMarkings[0]) * canvas.height;
+        }
+    </script>
+</body>
+</html>
