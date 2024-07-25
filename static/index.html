@@ -104,7 +104,7 @@
                 if ("geolocation" in navigator) {
                     navigator.geolocation.getCurrentPosition(function(position) {
                         userPosition = position;
-                        intervalId = setInterval(updateAndFetchLocations, 5000);
+                        intervalId = setInterval(updateAndFetchLocations, 1000);
                     }, function(error) {
                         document.getElementById('status').textContent = "Error: " + error.message;
                     });
@@ -193,6 +193,7 @@
         function displayUsers(users) {
             const hunterPoints = [];
             const speedPoints = [];
+            const currentUserPoint = { lat: userPosition.coords.latitude, lon: userPosition.coords.longitude };
 
             users.forEach(user => {
                 if (user.type === 'HUNTER') {
@@ -204,6 +205,18 @@
 
             displayHunterPoints(hunterPoints);
             countAndDisplaySpeedPoints(speedPoints);
+            displayCurrentUser(currentUserPoint);
+        }
+        function displayCurrentUser(point) {
+            const x = mapCoordToCanvasX(point.lon);
+            const y = mapCoordToCanvasY(point.lat);
+            
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.stroke();
         }
 
         function updateUserList(users) {
