@@ -92,7 +92,7 @@
             fetch('/')
             .then(response => response.json())
             .then(data => {
-                if (data.some(user => user.type !== 'NOTSTARTED') && !data.some(user => user.user === username)) {
+                if (data.some(user => user.type !== 'NOTSTARTED')) {
                     alert('Game has already started. You cannot join now.');
                     return;
                 }
@@ -211,14 +211,12 @@
             users.forEach(user => {
                 console.log(user);
                 const row = document.createElement('tr');
-                let DEBUG = true;
                 row.innerHTML = `
                     <td>${user.user}</td>
-                    <td>${user.type}</td>`;
-                row.innerHTML += DEBUG ? `
+                    <td>${user.type}</td>
                     <td>${user.lat ? user.lat.toFixed(6) : 'N/A'}</td>
                     <td>${user.long ? user.long.toFixed(6) : 'N/A'}</td>
-                ` : ``;
+                `;
                 userListBody.appendChild(row);
             });
         }
