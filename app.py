@@ -50,8 +50,6 @@ def register_or_update_user():
 @app.route('/', methods=['GET'])
 def get_users():
     users = load_users()
-    if not users:
-        return jsonify({"error": "No users found"}), 404
     
     result = []
     for user, data in users.items():
@@ -107,4 +105,4 @@ def page_path(path):
     return app.send_static_file(path)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5151)

@@ -92,6 +92,7 @@
             fetch('/')
             .then(response => response.json())
             .then(data => {
+                console.log(data)
                 if (data.some(user => user.type !== 'NOTSTARTED') && !data.some(user => user.user === username)) {
                     alert('Game has already started. You cannot join now.');
                     return;
