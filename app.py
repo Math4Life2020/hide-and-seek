@@ -1,24 +1,24 @@
 import os
 import pickle
 import random
+import threading
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-
 DB_FILE = 'users.pickle'
+db_lock = threading.Lock()
 
 def load_users():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, 'rb') as f:
-            return pickle.load(f)
-    return {}
+    with db_lock:
+        if os.path.exists(DB_FILE):
+            with open(DB_FILE, 'rb') as f:
+                return pickle.load(f)
+        return {}
 
 def save_users(users):
-    with open(DB_FILE, 'wb') as f:
-        pickle.dump(users, f)
-
-def round_coordinates(lat, long):
-    return round(lat * 2) / 2, round(long * 2) / 2
+    with db_lock:
+        with open(DB_FILE, 'wb') as f:
+            pickle.dump(users, f)
 
 @app.route('/', methods=['POST'])
 def register_or_update_user():
@@ -28,6 +28,7 @@ def register_or_update_user():
     user = data.get('user')
     lat = data.get('lat')
     long = data.get('long')
+    print(data)
     
     if not all([user, lat, long]):
         return jsonify({"error": "Missing required fields"}), 400
@@ -63,7 +64,7 @@ def get_users():
                 "long": data['long']
             })
         elif user_type == 'SPEEDRUNNER':
-            rounded_lat, rounded_long = round_coordinates(data['lat'], data['long'])
+            rounded_lat, rounded_long = data['lat'], data['long']
             result.append({
                 "user": user,
                 "type": user_type,
@@ -96,6 +97,14 @@ def start_game():
     save_users(users)
     
     return jsonify({"message": "Game started", "hunters": user_list[:3], "speedrunners": user_list[3:]})
+
+@app.route('/page/', methods=['GET'])
+def page():
+    return app.send_static_file('index.html')
+
+@app.route('/page/<path:path>', methods=['GET'])
+def page_path(path):
+    return app.send_static_file(path)
 
 if __name__ == '__main__':
     app.run(debug=True)

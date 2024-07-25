@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map with Server Communication and Geolocation</title>
+    <style>
+        #userList {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+        #userList table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #userList th, #userList td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        #userList th {
+            background-color: #f2f2f2;
+        }
+        #userType {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="userType"></div>
+    <div id="userInput" style="margin-bottom: 20px;">
+        <input type="text" id="username" placeholder="Enter your name">
+        <button onclick="startGame()">Start</button>
+    </div>
+    <div id="status"></div>
+    <canvas id="mapCanvas" style="display: none;"></canvas>
+    <div id="userList">
+        <h2>User List</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Type</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                </tr>
+            </thead>
+            <tbody id="userListBody">
+            </tbody>
+        </table>
+    </div>
+    <script>
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        let username = '';
+        let intervalId;
+        let userPosition = null;
+        let gameStarted = false;
+
+        // Configuration (you'll need to adjust these values)
+        const mapImage = new Image();
+        mapImage.src = 'map.png';
+        const columns = 10;
+        const rows = 10;
+
+        const bottomLeft = [37.652619930133646, -122.06165595572794];
+        const topRight = [37.65990423441164, -122.0513671139975];
+
+        // Longitude markings for vertical dividers (columns + 1)
+        const lonMarkings = [];
+        for (let i = 0; i <= columns; i++) {
+            lonMarkings.push(bottomLeft[1] + i*(topRight[1] - bottomLeft[1])/columns);
+        }
+        
+        // Latitude markings for horizontal dividers (rows + 1)
+        const latMarkings = [];
+        for (let i = 0; i <= rows; i++) {
+            latMarkings.push(bottomLeft[0] + i*(topRight[0] - bottomLeft[0])/rows);
+        }
+
+        function startGame() {
+            username = document.getElementById('username').value;
+            if (!username) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            // Check if game has already started
+            fetch('/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.some(user => user.type !== 'NOTSTARTED')) {
+                    alert('Game has already started. You cannot join now.');
+                    return;
+                }
+                
+                document.getElementById('userInput').style.display = 'none';
+                
+                // Check if geolocation is supported
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        userPosition = position;
+                        intervalId = setInterval(updateAndFetchLocations, 5000);
+                    }, function(error) {
+                        document.getElementById('status').textContent = "Error: " + error.message;
+                    });
+                } else {
+                    document.getElementById('status').textContent = "Geolocation is not supported by this browser.";
+                }
+            })
+            .catch((error) => console.error('Error:', error));
+        }
+
+        function updateAndFetchLocations() {
+            if (!userPosition) {
+                document.getElementById('status').textContent = "Waiting for location...";
+                return;
+            }
+
+            const lat = userPosition.coords.latitude;
+            const long = userPosition.coords.longitude;
+
+            document.getElementById('status').textContent = `Current position: ${lat}, ${long}`;
+
+            // Check if user is out of bounds
+            if (isOutOfBounds(lat, long)) {
+                console.log(`User ${username} is out of bounds at position: ${lat}, ${long}`);
+            }
+
+            // Send location to server
+            fetch('/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user: username,
+                    lat: lat,
+                    long: long
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.type !== 'NOTSTARTED') {
+                    gameStarted = true;
+                    document.getElementById('userType').textContent = `You are a ${data.type}`;
+                    canvas.style.display = 'block';
+                }
+            })
+            .catch((error) => console.error('Error:', error));
+
+            // Fetch all user locations
+            fetch('/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.some(user => user.type !== 'NOTSTARTED')) {
+                    gameStarted = true;
+                }
+
+                if (gameStarted) {
+                    // Clear previous drawings
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Redraw map and grid
+                    ctx.drawImage(mapImage, 0, 0);
+                    drawGrid();
+
+                    // Display user locations
+                    displayUsers(data);
+                }
+
+                // Update user list
+                updateUserList(data);
+            })
+            .catch((error) => console.error('Error:', error));
+
+            // Update user's position
+            navigator.geolocation.getCurrentPosition(function(position) {
+                userPosition = position;
+            }, function(error) {
+                document.getElementById('status').textContent = "Error: " + error.message;
+            });
+        }
+
+        function isOutOfBounds(lat, long) {
+            return lat < bottomLeft[0] || lat > topRight[0] || long < bottomLeft[1] || long > topRight[1];
+        }
+
+        function displayUsers(users) {
+            const hunterPoints = [];
+            const speedPoints = [];
+
+            users.forEach(user => {
+                if (user.type === 'HUNTER') {
+                    hunterPoints.push({ lat: user.lat, lon: user.long });
+                } else if (user.type === 'SPEEDRUNNER') {
+                    speedPoints.push({ lat: user.lat, lon: user.long });
+                }
+            });
+
+            displayHunterPoints(hunterPoints);
+            countAndDisplaySpeedPoints(speedPoints);
+        }
+
+        function updateUserList(users) {
+            const userListBody = document.getElementById('userListBody');
+            userListBody.innerHTML = '';
+            users.forEach(user => {
+                console.log(user);
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.user}</td>
+                    <td>${user.type}</td>
+                    <td>${user.lat ? user.lat.toFixed(6) : 'N/A'}</td>
+                    <td>${user.long ? user.long.toFixed(6) : 'N/A'}</td>
+                `;
+                userListBody.appendChild(row);
+            });
+        }
+
+        mapImage.onload = function() {
+            canvas.width = mapImage.width;
+            canvas.height = mapImage.height;
+            ctx.drawImage(mapImage, 0, 0);
+            drawGrid();
+        };
+
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 1.0)';
+            ctx.lineWidth = 1;
+
+            // Draw vertical lines
+            for (let i = 1; i < columns; i++) {
+                const x = (i / columns) * canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            // Draw horizontal lines
+            for (let i = 1; i < rows; i++) {
+                const y = (i / rows) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        function countAndDisplaySpeedPoints(speedPoints) {
+            const cellCounts = Array(rows).fill().map(() => Array(columns).fill(0));
+
+            speedPoints.forEach(point => {
+                const col = findIndex(lonMarkings, point.lon);
+                const row = cellCounts.length - 1 - findIndex(latMarkings, point.lat);
+                if (col >= 0 && col < columns && row >= 0 && row < rows) {
+                    cellCounts[row][col]++;
+                }
+            });
+
+            ctx.font = '20px Arial';
+            ctx.fillStyle = 'black';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < columns; col++) {
+                    const x = (col + 0.5) * (canvas.width / columns);
+                    const y = (row + 0.5) * (canvas.height / rows);
+                    ctx.fillText(cellCounts[row][col].toString(), x, y);
+                }
+            }
+        }
+
+        function displayHunterPoints(hunterPoints) {
+            hunterPoints.forEach(point => {
+                const x = mapCoordToCanvasX(point.lon);
+                const y = mapCoordToCanvasY(point.lat);
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.stroke();
+            });
+        }
+
+        function findIndex(arr, value) {
+            for (let i = 0; i < arr.length - 1; i++) {
+                if (value >= arr[i] && value < arr[i + 1]) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function mapCoordToCanvasX(lon) {
+            return (lon - lonMarkings[0]) / (lonMarkings[lonMarkings.length - 1] - lonMarkings[0]) * canvas.width;
+        }
+
+        function mapCoordToCanvasY(lat) {
+            return canvas.height - (lat - latMarkings[0]) / (latMarkings[latMarkings.length - 1] - latMarkings[0]) * canvas.height;
+        }
+    </script>
+</body>
+</html>
