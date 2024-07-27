@@ -27,6 +27,25 @@
             font-size: 1.2em;
             margin-bottom: 10px;
         }
+        #deadButton {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: red;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            display: none;
+        }
+        #deadCounter {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -36,6 +55,7 @@
         <button onclick="startGame()">Start</button>
     </div>
     <div id="status"></div>
+    <div id="deadCounter"></div>
     <canvas id="mapCanvas" style="display: none;"></canvas>
     <div id="userList">
         <h2>User List</h2>
@@ -52,6 +72,7 @@
             </tbody>
         </table>
     </div>
+    <button id="deadButton" onclick="toggleDead()">I'm Dead</button>
     <script>
         const canvas = document.getElementById('mapCanvas');
         const ctx = canvas.getContext('2d');
@@ -59,6 +80,8 @@
         let intervalId;
         let userPosition = null;
         let gameStarted = false;
+        let userType = 'NOTSTARTED';
+        let isDead = false;
 
         // Configuration (you'll need to adjust these values)
         const mapImage = new Image();
@@ -147,8 +170,14 @@
             .then(data => {
                 if (data.type !== 'NOTSTARTED') {
                     gameStarted = true;
+                    userType = data.type;
                     document.getElementById('userType').textContent = `You are a ${data.type}`;
                     canvas.style.display = 'block';
+                    if (data.type === 'SPEEDRUNNER' || data.type === 'DEAD') {
+                        document.getElementById('deadButton').style.display = 'block';
+                    } else {
+                        document.getElementById('deadButton').style.display = 'none';
+                    }
                 }
             })
             .catch((error) => console.error('Error:', error));
@@ -175,6 +204,9 @@
 
                 // Update user list
                 updateUserList(data);
+
+                // Update dead counter
+                updateDeadCounter(data);
             })
             .catch((error) => console.error('Error:', error));
 
@@ -205,8 +237,11 @@
 
             displayHunterPoints(hunterPoints);
             countAndDisplaySpeedPoints(speedPoints);
-            displayCurrentUser(currentUserPoint);
+            if (userType !== 'DEAD') {
+                displayCurrentUser(currentUserPoint);
+            }
         }
+
         function displayCurrentUser(point) {
             const x = mapCoordToCanvasX(point.lon);
             const y = mapCoordToCanvasY(point.lat);
@@ -223,18 +258,25 @@
             const userListBody = document.getElementById('userListBody');
             userListBody.innerHTML = '';
             users.forEach(user => {
-                console.log(user);
-                const row = document.createElement('tr');
-                let DEBUG = true;
-                row.innerHTML = `
-                    <td>${user.user}</td>
-                    <td>${user.type}</td>`;
-                row.innerHTML += DEBUG ? `
-                    <td>${user.lat ? user.lat.toFixed(6) : 'N/A'}</td>
-                    <td>${user.long ? user.long.toFixed(6) : 'N/A'}</td>
-                ` : ``;
-                userListBody.appendChild(row);
+                if (user.type !== 'DEAD') {
+                    const row = document.createElement('tr');
+                    let DEBUG = true;
+                    row.innerHTML = `
+                        <td>${user.user}</td>
+                        <td>${user.type}</td>`;
+                    row.innerHTML += DEBUG ? `
+                        <td>${user.lat ? user.lat.toFixed(6) : 'N/A'}</td>
+                        <td>${user.long ? user.long.toFixed(6) : 'N/A'}</td>
+                    ` : ``;
+                    userListBody.appendChild(row);
+                }
             });
+        }
+
+        function updateDeadCounter(users) {
+            const deadCount = users.filter(user => user.type === 'DEAD').length;
+            const speedrunnerCount = users.filter(user => user.type === 'SPEEDRUNNER' || user.type === 'DEAD').length;
+            document.getElementById('deadCounter').textContent = `Dead: ${deadCount}/${speedrunnerCount}`;
         }
 
         mapImage.onload = function() {
@@ -321,6 +363,33 @@
 
         function mapCoordToCanvasY(lat) {
             return canvas.height - (lat - latMarkings[0]) / (latMarkings[latMarkings.length - 1] - latMarkings[0]) * canvas.height;
+        }
+
+        function toggleDead() {
+            if (userType === 'SPEEDRUNNER' || userType === 'DEAD') {
+                fetch('/toggle-dead', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user: username
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    let user = data;
+                    isDead = user.type === 'DEAD';
+                    console.log(`User ${user.user} is ${user.type}`);
+                    document.getElementById('userType').textContent = `You are ${isDead ? 'DEAD' : 'a SPEEDRUNNER'}`;
+                    document.getElementById('deadButton').textContent = isDead ? 'I\'m Alive' : 'I\'m Dead';
+                    if (isDead) {
+                        document.getElementById('deadButton').style.display = 'none';
+                    }
+                })
+                .catch((error) => console.error('Error:', error));
+            }
         }
     </script>
 </body>

@@ -47,6 +47,25 @@ def register_or_update_user():
     
     return jsonify({"type": users[user]['type']})
 
+@app.route('/toggle-dead', methods=["POST"])
+def toggle_dead():
+    data = request.json
+    users = load_users()
+
+    user = data.get('user')
+    if user not in users:
+        return jsonify({"error": "User not found"}), 404
+    if users[user]['type'] != 'SPEEDRUNNER' and users[user]['type'] != 'DEAD':
+        return jsonify({"error": "User is not a speedrunner; can only kill speedrunners", "user": users[user]}), 400
+    if users[user]['type'] == 'DEAD':
+        users[user]['type'] = 'SPEEDRUNNER'
+    elif users[user]['type'] == 'SPEEDRUNNER':
+        users[user]['type'] = 'DEAD'
+    save_users(users)
+    return jsonify(users[user])
+    
+
+
 @app.route('/', methods=['GET'])
 def get_users():
     users = load_users()
@@ -85,16 +104,18 @@ def start_game():
     
     user_list = list(users.keys())
     random.shuffle(user_list)
+
+    hunter_num = len(user_list) // 4
     
     for i, user in enumerate(user_list):
-        if i < 3:
+        if i < hunter_num:
             users[user]['type'] = 'HUNTER'
         else:
             users[user]['type'] = 'SPEEDRUNNER'
     
     save_users(users)
     
-    return jsonify({"message": "Game started", "hunters": user_list[:3], "speedrunners": user_list[3:]})
+    return jsonify({"message": "Game started", "users": users})
 
 @app.route('/page/', methods=['GET'])
 def page():
