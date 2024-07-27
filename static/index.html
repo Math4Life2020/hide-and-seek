@@ -260,7 +260,7 @@
             users.forEach(user => {
                 if (user.type !== 'DEAD') {
                     const row = document.createElement('tr');
-                    let DEBUG = true;
+                    let DEBUG = false;
                     row.innerHTML = `
                         <td>${user.user}</td>
                         <td>${user.type}</td>`;
