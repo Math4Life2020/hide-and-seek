@@ -105,7 +105,7 @@ def start_game():
     user_list = list(users.keys())
     random.shuffle(user_list)
 
-    hunter_num = len(user_list) // 4
+    hunter_num = len(user_list) // 2
     
     for i, user in enumerate(user_list):
         if i < hunter_num:
